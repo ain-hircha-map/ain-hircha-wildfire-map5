@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Wildfire Map - Ain Hircha</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+    #login, #mapPage {
+      display: none;
+    }
+    #map {
+      height: 90vh;
+      width: 100%;
+    }
+    .centered {
+      text-align: center;
+      margin-top: 20vh;
+    }
+    .btn {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #adminPassword {
+      padding: 8px;
+      font-size: 16px;
+    }
+    #controls {
+      text-align: center;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="login" class="centered">
+  <h2>Welcome to Ain Hircha Wildfire Tracker</h2>
+  <div>
+    <button class="btn" onclick="showAdminLogin()">Enter as Admin</button>
+    <button class="btn" onclick="enterAsUser()">Continue Normally</button>
+  </div>
+  <div id="adminLogin" style="display:none; margin-top: 20px;">
+    <input type="password" id="adminPassword" placeholder="Enter Admin Password" />
+    <button class="btn" onclick="verifyAdmin()">Login</button>
+    <p id="errorMsg" style="color:red;"></p>
+  </div>
+</div>
+
+<div id="mapPage">
+  <div id="controls">
+    <button id="clearBtn" class="btn" style="display:none;" onclick="clearMarkers()">Clear Fires</button>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+  let isAdmin = false;
+  let map;
+  let markers = [];
+
+  const ainHirchaCoords = [33.45619224718064, 35.78332432291716];
+
+  const ainHirchaBounds = L.latLngBounds(
+    [33.4460, 35.7680],  // Southwest corner
+    [33.4665, 35.7980]   // Northeast corner
+  );
+
+  document.getElementById("login").style.display = "block";
+
+  function showAdminLogin() {
+    document.getElementById("adminLogin").style.display = "block";
+  }
+
+  function verifyAdmin() {
+    const password = document.getElementById("adminPassword").value;
+    if (password === "Pass-M452025") {
+      isAdmin = true;
+      startMap();
+    } else {
+      document.getElementById("errorMsg").innerText = "Incorrect password.";
+    }
+  }
+
+  function enterAsUser() {
+    isAdmin = false;
+    startMap();
+  }
+
+  function startMap() {
+    document.getElementById("login").style.display = "none";
+    document.getElementById("mapPage").style.display = "block";
+
+    if (isAdmin) {
+      document.getElementById("clearBtn").style.display = "inline-block";
+    }
+
+    map = L.map("map", {
+      center: ainHirchaCoords,
+      zoom: 17,
+      maxBounds: ainHirchaBounds,
+      maxBoundsViscosity: 1.0,
+      zoomControl: true,
+      minZoom: 14,
+      maxZoom: 18
+    });
+
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        attribution: "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, etc.",
+        maxZoom: 19,
+      }
+    ).addTo(map);
+
+    loadMarkers();
+
+    if (isAdmin) {
+      map.on("click", function (e) {
+        if (!ainHirchaBounds.contains(e.latlng)) return;
+
+        const lat = e.latlng.lat.toFixed(5);
+        const lng = e.latlng.lng.toFixed(5);
+        const now = new Date().toLocaleString();
+
+        const marker = L.marker([lat, lng]).addTo(map);
+        marker.bindPopup(
+          `<b>🔥 Fire reported</b><br><b>Time:</b> ${now}<br><b>Location:</b> ${lat}, ${lng}`
+        );
+        markers.push(marker);
+
+        saveMarkerToStorage({ lat, lng, time: now });
+      });
+    }
+  }
+
+  function saveMarkerToStorage(marker) {
+    let saved = JSON.parse(localStorage.getItem("fireMarkers") || "[]");
+    saved.push(marker);
+    localStorage.setItem("fireMarkers", JSON.stringify(saved));
+  }
+
+  function loadMarkers() {
+    const saved = JSON.parse(localStorage.getItem("fireMarkers") || "[]");
+    saved.forEach((item) => {
+      const marker = L.marker([item.lat, item.lng]).addTo(map);
+      marker.bindPopup(
+        `<b>🔥 Fire reported</b><br><b>Time:</b> ${item.time}<br><b>Location:</b> ${item.lat}, ${item.lng}`
+      );
+      markers.push(marker);
+    });
+  }
+
+  function clearMarkers() {
+    markers.forEach((m) => map.removeLayer(m));
+    markers = [];
+    localStorage.removeItem("fireMarkers");
+    alert("All fire markers cleared.");
+  }
+</script>
+
+</body>
+</html>
